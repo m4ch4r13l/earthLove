@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nuestro Mundo — Mapa de Recuerdos 3D</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #03050c;
+      color: #f8fafc;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+    }
+
+    /* UI Superior */
+    .hud-top {
+      position: fixed;
+      top: 20px;
+      left: 24px;
+      right: 24px;
+      z-index: 10;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      pointer-events: none;
+    }
+    .title-box {
+      pointer-events: auto;
+      background: rgba(10, 15, 30, 0.55);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 14px 20px;
+      border-radius: 16px;
+      max-width: 380px;
+    }
+    .title-box h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      background: linear-gradient(90deg, #ff7eb3, #ff758c, #ffd1ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 4px;
+    }
+    .title-box p {
+      font-size: 0.85rem;
+      color: #cbd5e1;
+      line-height: 1.4;
+    }
+    .counter-badge {
+      display: inline-block;
+      margin-top: 8px;
+      font-size: 0.75rem;
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+
+    .actions-top {
+      pointer-events: auto;
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(10px);
+      color: #f8fafc;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 10px 16px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn:hover {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: #fb7185;
+      transform: translateY(-1px);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f43f5e, #ec4899);
+      border: none;
+      font-weight: 600;
+    }
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #e11d48, #db2777);
+    }
+
+    /* Barra Inferior de Lugares */
+    .hud-bottom {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+      background: rgba(10, 15, 30, 0.65);
+      backdrop-filter: blur(12px);
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      max-width: 92vw;
+      overflow-x: auto;
+    }
+    .pin-chip {
+      white-space: nowrap;
+      padding: 7px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      background: rgba(255, 255, 255, 0.06);
+      color: #e2e8f0;
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .pin-chip:hover, .pin-chip.active {
+      background: rgba(244, 63, 94, 0.25);
+      border-color: #fb7185;
+      color: #fff;
+    }
+
+    /* Modal de Recuerdo */
+    .memory-card {
+      position: fixed;
+      right: 24px;
+      top: 50%;
+      transform: translateY(-50%) translateX(120%);
+      width: 340px;
+      max-width: calc(100vw - 48px);
+      background: rgba(13, 19, 38, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 20px;
+      overflow: hidden;
+      z-index: 20;
+      transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+    }
+    .memory-card.open {
+      transform: translateY(-50%) translateX(0);
+    }
+    .memory-card img {
+      width: 100%;
+      height: 190px;
+      object-fit: cover;
+      display: block;
+      background: #1e293b;
+    }
+    .memory-body {
+      padding: 18px 20px;
+    }
+    .memory-date {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #fb7185;
+      margin-bottom: 4px;
+    }
+    .memory-title {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .memory-desc {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      margin-bottom: 16px;
+    }
+    .memory-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .close-card {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.55);
+      color: #fff;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+    }
+
+    /* Modal Personalizador */
+    .editor-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.82);
+      backdrop-filter: blur(8px);
+      z-index: 50;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .editor-overlay.open { display: flex; }
+    .editor-box {
+      background: #0f172a;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      width: 100%;
+      max-width: 560px;
+      max-height: 88vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .editor-header {
+      padding: 18px 22px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .editor-content {
+      padding: 20px 22px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group label { font-size: 0.78rem; color: #94a3b8; }
+    .field-group input, .field-group textarea {
+      background: #1e293b;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      padding: 9px 12px;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-family: inherit;
+    }
+    .place-item {
+      background: rgba(30, 41, 59, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 12px;
+      border-radius: 12px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .place-item .full { grid-column: span 2; }
+    .editor-footer {
+      padding: 16px 22px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .tooltip {
+      position: fixed;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid #fb7185;
+      color: #fff;
+      padding: 5px 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      pointer-events: none;
+      z-index: 30;
+      display: none;
+      transform: translate(-50%, -140%);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="canvas-container"></div>
+  <div id="tooltip" class="tooltip"></div>
+
+  <!-- HUD Superior -->
+  <div class="hud-top">
+    <div class="title-box">
+      <h1 id="ui-title">Nuestro Mundo</h1>
+      <p id="ui-subtitle">Cada punto brillante es un lugar donde nuestra historia dejó huella.</p>
+      <div class="counter-badge" id="ui-counter">Calculando tiempo juntos...</div>
+    </div>
+    <div class="actions-top">
+      <button class="btn btn-primary" id="btn-tour">▶ Iniciar Tour</button>
+      <button class="btn" id="btn-edit">✨ Personalizar</button>
+    </div>
+  </div>
+
+  <!-- Barra Inferior de Chips -->
+  <div class="hud-bottom" id="chips-container"></div>
+
+  <!-- Tarjeta de Recuerdo -->
+  <div class="memory-card" id="memory-card">
+    <button class="close-card" id="close-card">✕</button>
+    <img id="card-img" src="" alt="Recuerdo" />
+    <div class="memory-body">
+      <div class="memory-date" id="card-date"></div>
+      <div class="memory-title" id="card-title"></div>
+      <div class="memory-desc" id="card-desc"></div>
+      <div class="memory-nav">
+        <button class="btn" id="prev-mem">← Anterior</button>
+        <button class="btn" id="next-mem">Siguiente →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Editor / Generador de Link -->
+  <div class="editor-overlay" id="editor-overlay">
+    <div class="editor-box">
+      <div class="editor-header">
+        <h3>Personalizar Regalo</h3>
+        <button class="btn" id="close-editor">✕</button>
+      </div>
+      <div class="editor-content" id="editor-content">
+        <div class="field-group">
+          <label>Título del Mundo (ej. "Para ti, mi amor")</label>
+          <input type="text" id="ed-title" />
+        </div>
+        <div class="field-group">
+          <label>Subtítulo / Dedicatoria</label>
+          <input type="text" id="ed-subtitle" />
+        </div>
+        <div class="field-group">
+          <label>Fecha en que empezó su historia</label>
+          <input type="date" id="ed-start-date" />
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+          <label style="font-size:0.85rem; color:#e2e8f0; font-weight:600;">Lugares y Recuerdos</label>
+          <button class="btn" id="btn-add-place" style="padding:5px 10px; font-size:0.78rem;">+ Agregar Lugar</button>
+        </div>
+        <div id="places-list" style="display:flex; flex-direction:column; gap:10px;"></div>
+      </div>
+      <div class="editor-footer">
+        <button class="btn" id="btn-apply">Aplicar Vista Previa</button>
+        <button class="btn btn-primary" id="btn-share">🔗 Copiar Enlace de Regalo</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Three.js + OrbitControls desde CDN -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. CONFIGURACIÓN POR DEFECTO (PERSONALIZABLE)
+    // ==========================================
+    const DEFAULT_DATA = {
+      title: "Nuestro Mundo ❤️",
+      subtitle: "Cada punto en este planeta guarda un momento contigo.",
+      startDate: "2024-02-14",
+      places: [
+        {
+          title: "Donde todo comenzó",
+          date: "14 Feb 2024",
+          lat: 20.6767,
+          lon: -103.3475,
+          desc: "Ese primer café donde el tiempo se pasó volando y supe que quería conocerte mucho más.",
+          img: "https://images.unsplash.com/photo-1511920170033-f8396924c348?auto=format&fit=crop&w=700&q=80"
+        },
+        {
+          title: "Escapada a la playa",
+          date: "18 Ago 2024",
+          lat: 20.6534,
+          lon: -105.2253,
+          desc: "Viendo el atardecer frente al mar. Uno de mis días favoritos a tu lado.",
+          img: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=700&q=80"
+        },
+        {
+          title: "Nuestro viaje soñado",
+          date: "12 Dic 2024",
+          lat: 48.8566,
+          lon: 2.3522,
+          desc: "Caminando de noche por calles iluminadas y prometiéndonos mil aventuras más.",
+          img: "https://images.unsplash.com/photo-1502602898657-3e91760cbb34?auto=format&fit=crop&w=700&q=80"
+        },
+        {
+          title: "Siguiente aventura juntos",
+          date: "Próximamente...",
+          lat: 35.6762,
+          lon: 139.6503,
+          desc: "El mundo es enorme, pero mi lugar favorito siempre va a ser donde estés tú.",
+          img: "https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?auto=format&fit=crop&w=700&q=80"
+        }
+      ]
+    };
+
+    // Cargar datos desde URL (?data=...) si existen
+    function loadConfig() {
+      const params = new URLSearchParams(window.location.search);
+      const encoded = params.get('data');
+      if (encoded) {
+        try {
+          const jsonStr = decodeURIComponent(escape(atob(encoded)));
+          return JSON.parse(jsonStr);
+        } catch (e) {
+          console.warn("No se pudo decodificar la URL, usando datos por defecto.");
+        }
+      }
+      return structuredClone(DEFAULT_DATA);
+    }
+
+    let appData = loadConfig();
+
+    // ==========================================
+    // 2. ESCENA THREE.JS Y GLOBO TERRÁQUEO
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+    camera.position.set(0, 1.5, 6.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 3.1;
+    controls.maxDistance = 12;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.45;
+
+    // Iluminación
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
+    scene.add(ambientLight);
+    const dirLight = new THREE.DirectionalLight(0xffb6c1, 1.2);
+    dirLight.position.set(5, 3, 5);
+    scene.add(dirLight);
+
+    // Estrellas de fondo
+    const starGeo = new THREE.BufferGeometry();
+    const starCount = 2200;
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount * 3; i++) {
+      starPos[i] = (Math.random() - 0.5) * 90;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.08, transparent: true, opacity: 0.8 });
+    scene.add(new THREE.Points(starGeo, starMat));
+
+    // Grupo principal del planeta
+    const earthGroup = new THREE.Group();
+    scene.add(earthGroup);
+
+    const GLOBE_RADIUS = 2;
+    const textureLoader = new THREE.TextureLoader();
+
+    // Textura nocturna de la Tierra (pública de Three.js / NASA)
+    const earthTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
+    const bumpTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-topology.png');
+
+    const earthMat = new THREE.MeshStandardMaterial({
+      map: earthTexture,
+      bumpMap: bumpTexture,
+      bumpScale: 0.04,
+      roughness: 0.7,
+      metalness: 0.1
+    });
+    const earthMesh = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS, 64, 64), earthMat);
+    earthGroup.add(earthMesh);
+
+    // Halo atmosférico (Shader Fresnel)
+    const atmosMat = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        void main() {
+          float intensity = pow(0.65 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+          gl_FragColor = vec4(0.95, 0.35, 0.55, 1.0) * intensity * 1.4;
+        }
+      `
+    });
+    const atmosMesh = new THREE.Mesh(new THREE.SphereGeometry(GLOBE_RADIUS * 1.12, 64, 64), atmosMat);
+    earthGroup.add(atmosMesh);
+
+    // ==========================================
+    // 3. CONVERSIÓN LAT/LON Y MARCADORES + ARCOS
+    // ==========================================
+    function latLonToVector3(lat, lon, radius = GLOBE_RADIUS) {
+      const phi = (90 - lat) * (Math.PI / 180);
+      const theta = (lon + 180) * (Math.PI / 180);
+      const x = -(radius * Math.sin(phi) * Math.cos(theta));
+      const z = radius * Math.sin(phi) * Math.sin(theta);
+      const y = radius * Math.cos(phi);
+      return new THREE.Vector3(x, y, z);
+    }
+
+    const markersGroup = new THREE.Group();
+    earthGroup.add(markersGroup);
+
+    let pinMeshes = [];
+    let pulseRings = [];
+    let arcParticles = [];
+
+    function rebuildMarkers() {
+      // Limpiar anteriores
+      while (markersGroup.children.length > 0) {
+        markersGroup.remove(markersGroup.children[0]);
+      }
+      pinMeshes = [];
+      pulseRings = [];
+      arcParticles = [];
+
+      const places = appData.places;
+      const points3D = [];
+
+      places.forEach((place, idx) => {
+        const pos = latLonToVector3(Number(place.lat), Number(place.lon), GLOBE_RADIUS + 0.02);
+        points3D.push(pos);
+
+        // Esfera núcleo del pin
+        const pinGeo = new THREE.SphereGeometry(0.045, 16, 16);
+        const pinMat = new THREE.MeshBasicMaterial({ color: 0xff4d6d });
+        const pin = new THREE.Mesh(pinGeo, pinMat);
+        pin.position.copy(pos);
+        pin.userData = { index: idx, title: place.title };
+        markersGroup.add(pin);
+        pinMeshes.push(pin);
+
+        // Anillo pulsante alrededor del pin
+        const ringGeo = new THREE.RingGeometry(0.055, 0.085, 32);
+        const ringMat = new THREE.MeshBasicMaterial({
+          color: 0xff8fa3,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.8
+        });
+        const ring = new THREE.Mesh(ringGeo, ringMat);
+        ring.position.copy(pos);
+        ring.lookAt(pos.clone().multiplyScalar(2));
+        markersGroup.add(ring);
+        pulseRings.push({ mesh: ring, phase: idx * 0.9 });
+      });
+
+      // Crear arcos brillantes conectando lugares consecutivos
+      for (let i = 0; i < points3D.length - 1; i++) {
+        const start = points3D[i];
+        const end = points3D[i + 1];
+        const dist = start.distanceTo(end);
+        const mid = start.clone().add(end).multiplyScalar(0.5).normalize().multiplyScalar(GLOBE_RADIUS + dist * 0.35);
+
+        const curve = new THREE.QuadraticBezierCurve3(start, mid, end);
+        const curvePoints = curve.getPoints(50);
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(curvePoints);
+        const lineMat = new THREE.LineBasicMaterial({
+          color: 0xfb7185,
+          transparent: true,
+          opacity: 0.45
+        });
+        markersGroup.add(new THREE.Line(lineGeo, lineMat));
+
+        // Partícula viajera sobre el arco
+        const spark = new THREE.Mesh(
+          new THREE.SphereGeometry(0.025, 8, 8),
+          new THREE.MeshBasicMaterial({ color: 0xffe4e6 })
+        );
+        markersGroup.add(spark);
+        arcParticles.push({ mesh: spark, curve, t: i * 0.25 });
+      }
+    }
+
+    // ==========================================
+    // 4. INTERACCIÓN, CÁMARA SUAVE Y TOUR
+    // ==========================================
+    let currentIndex = -1;
+    let targetCamPos = null;
+    let isTourRunning = false;
+    let tourTimer = null;
+
+    function focusPlace(index) {
+      if (index < 0 || index >= appData.places.length) return;
+      currentIndex = index;
+      const place = appData.places[index];
+
+      // Detener rotación automática para enfocar bien
+      controls.autoRotate = false;
+
+      const pinPos = latLonToVector3(Number(place.lat), Number(place.lon), GLOBE_RADIUS);
+      // Posicionar cámara frente al pin a una distancia cómoda
+      targetCamPos = pinPos.clone().normalize().multiplyScalar(4.4);
+
+      // Actualizar tarjeta UI
+      document.getElementById('card-img').src = place.img || 'https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=700&q=80';
+      document.getElementById('card-date').textContent = place.date;
+      document.getElementById('card-title').textContent = place.title;
+      document.getElementById('card-desc').textContent = place.desc;
+      document.getElementById('memory-card').classList.add('open');
+
+      // Resaltar chip activo
+      document.querySelectorAll('.pin-chip').forEach((chip, idx) => {
+        chip.classList.toggle('active', idx === index);
+      });
+    }
+
+    function closeCard() {
+      document.getElementById('memory-card').classList.remove('open');
+      targetCamPos = null;
+      controls.autoRotate = true;
+      stopTour();
+      document.querySelectorAll('.pin-chip').forEach(c => c.classList.remove('active'));
+    }
+
+    function startTour() {
+      if (isTourRunning) {
+        stopTour();
+        return;
+      }
+      isTourRunning = true;
+      document.getElementById('btn-tour').textContent = '⏸ Pausar Tour';
+      let step = currentIndex >= 0 ? currentIndex : 0;
+      focusPlace(step);
+
+      tourTimer = setInterval(() => {
+        step = (step + 1) % appData.places.length;
+        focusPlace(step);
+      }, 5500);
+    }
+
+    function stopTour() {
+      isTourRunning = false;
+      clearInterval(tourTimer);
+      document.getElementById('btn-tour').textContent = '▶ Iniciar Tour';
+    }
+
+    // Raycasting para clics y hover en los pines
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const tooltip = document.getElementById('tooltip');
+
+    window.addEventListener('pointermove', (e) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(pinMeshes);
+
+      if (intersects.length > 0) {
+        document.body.style.cursor = 'pointer';
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${e.clientX}px`;
+        tooltip.style.top = `${e.clientY}px`;
+        tooltip.textContent = intersects[0].object.userData.title;
+      } else {
+        document.body.style.cursor = 'default';
+        tooltip.style.display = 'none';
+      }
+    });
+
+    window.addEventListener('click', (e) => {
+      if (e.target.closest('.hud-top, .hud-bottom, .memory-card, .editor-overlay')) return;
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(pinMeshes);
+      if (intersects.length > 0) {
+        stopTour();
+        focusPlace(intersects[0].object.userData.index);
+      }
+    });
+
+    // ==========================================
+    // 5. ACTUALIZACIÓN DE UI Y CONTADOR EN VIVO
+    // ==========================================
+    function renderUI() {
+      document.getElementById('ui-title').textContent = appData.title;
+      document.getElementById('ui-subtitle').textContent = appData.subtitle;
+
+      const chipsContainer = document.getElementById('chips-container');
+      chipsContainer.innerHTML = '';
+      appData.places.forEach((p, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'pin-chip';
+        btn.textContent = `📍 ${p.title}`;
+        btn.onclick = () => {
+          stopTour();
+          focusPlace(idx);
+        };
+        chipsContainer.appendChild(btn);
+      });
+
+      rebuildMarkers();
+    }
+
+    function updateRelationshipCounter() {
+      if (!appData.startDate) return;
+      const start = new Date(appData.startDate + 'T00:00:00');
+      const now = new Date();
+      const diff = Math.max(0, now - start);
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24);
+      const mins = Math.floor((diff / 1000 / 60) % 60);
+      document.getElementById('ui-counter').textContent =
+        `✨ ${days} días, ${hours}h y ${mins}m juntos`;
+    }
+    setInterval(updateRelationshipCounter, 1000);
+
+    // ==========================================
+    // 6. PANEL PERSONALIZADOR Y GENERADOR DE URL
+    // ==========================================
+    const editorOverlay = document.getElementById('editor-overlay');
+    const placesListEl = document.getElementById('places-list');
+
+    function openEditor() {
+      document.getElementById('ed-title').value = appData.title;
+      document.getElementById('ed-subtitle').value = appData.subtitle;
+      document.getElementById('ed-start-date').value = appData.startDate;
+      renderEditorPlaces();
+      editorOverlay.classList.add('open');
+    }
+
+    function renderEditorPlaces() {
+      placesListEl.innerHTML = '';
+      appData.places.forEach((p, i) => {
+        const div = document.createElement('div');
+        div.className = 'place-item';
+        div.innerHTML = `
+          <input type="text" placeholder="Título del lugar" value="${p.title}" data-idx="${i}" data-field="title" />
+          <input type="text" placeholder="Fecha (ej. 14 Feb 2024)" value="${p.date}" data-idx="${i}" data-field="date" />
+          <input type="number" step="any" placeholder="Latitud" value="${p.lat}" data-idx="${i}" data-field="lat" />
+          <input type="number" step="any" placeholder="Longitud" value="${p.lon}" data-idx="${i}" data-field="lon" />
+          <input type="text" class="full" placeholder="URL de la foto (https://...)" value="${p.img}" data-idx="${i}" data-field="img" />
+          <textarea class="full" rows="2" placeholder="Mensaje o recuerdo..." data-idx="${i}" data-field="desc">${p.desc}</textarea>
+          <button class="btn full" style="justify-content:center; color:#fda4af;" onclick="window.removePlace(${i})">Eliminar lugar</button>
+        `;
+        placesListEl.appendChild(div);
+      });
+    }
+
+    window.removePlace = (idx) => {
+      appData.places.splice(idx, 1);
+      renderEditorPlaces();
+    };
+
+    function syncEditorData() {
+      appData.title = document.getElementById('ed-title').value;
+      appData.subtitle = document.getElementById('ed-subtitle').value;
+      appData.startDate = document.getElementById('ed-start-date').value;
+
+      placesListEl.querySelectorAll('[data-idx]').forEach(el => {
+        const idx = Number(el.dataset.idx);
+        const field = el.dataset.field;
+        appData.places[idx][field] = el.value;
+      });
+    }
+
+    document.getElementById('btn-edit').onclick = openEditor;
+    document.getElementById('close-editor').onclick = () => editorOverlay.classList.remove('open');
+    document.getElementById('btn-add-place').onclick = () => {
+      syncEditorData();
+      appData.places.push({
+        title: "Nuevo Recuerdo",
+        date: "Hoy",
+        lat: 19.4326,
+        lon: -99.1332,
+        desc: "Escribe aquí lo que hace especial este lugar...",
+        img: "https://images.unsplash.com/photo-1518199266791-5375a83190b7?auto=format&fit=crop&w=700&q=80"
+      });
+      renderEditorPlaces();
+    };
+
+    document.getElementById('btn-apply').onclick = () => {
+      syncEditorData();
+      renderUI();
+      updateRelationshipCounter();
+      editorOverlay.classList.remove('open');
+    };
+
+    document.getElementById('btn-share').onclick = () => {
+      syncEditorData();
+      renderUI();
+      const jsonStr = JSON.stringify(appData);
+      const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+      const shareUrl = `${window.location.origin}${window.location.pathname}?data=${encoded}`;
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        alert("¡Enlace personalizado copiado al portapapeles! Ya puedes enviárselo a esa persona especial.");
+      });
+    };
+
+    // Controles de tarjeta y tour
+    document.getElementById('close-card').onclick = closeCard;
+    document.getElementById('btn-tour').onclick = startTour;
+    document.getElementById('prev-mem').onclick = () => {
+      stopTour();
+      const prev = (currentIndex - 1 + appData.places.length) % appData.places.length;
+      focusPlace(prev);
+    };
+    document.getElementById('next-mem').onclick = () => {
+      stopTour();
+      const next = (currentIndex + 1) % appData.places.length;
+      focusPlace(next);
+    };
+
+    // ==========================================
+    // 7. LOOP DE ANIMACIÓN
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const elapsed = clock.getElapsedTime();
+
+      // Animar anillos pulsantes en los pines
+      pulseRings.forEach(item => {
+        const scale = 1 + 0.5 * Math.sin(elapsed * 3 + item.phase);
+        item.mesh.scale.set(scale, scale, 1);
+        item.mesh.material.opacity = 0.85 - 0.5 * Math.sin(elapsed * 3 + item.phase);
+      });
+
+      // Animar partículas viajando por los arcos
+      arcParticles.forEach(p => {
+        p.t = (p.t + 0.004) % 1;
+        const pos = p.curve.getPointAt(p.t);
+        p.mesh.position.copy(pos);
+      });
+
+      // Interpolación suave de cámara al enfocar un lugar
+      if (targetCamPos) {
+        camera.position.lerp(targetCamPos, 0.05);
+        if (camera.position.distanceTo(targetCamPos) < 0.03) {
+          targetCamPos = null;
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Inicializar
+    renderUI();
+    updateRelationshipCounter();
+    animate();
+  </script>
+</body>
+</html>
